@@ -361,8 +361,11 @@ func VerifyPSS(pub *PublicKey, hash crypto.Hash, digest []byte, sig []byte, opts
 
 	emBits := pub.N.BitLen() - 1
 	emLen := (emBits + 7) / 8
-	em, err := encrypt(pub, sig)
-	if err != nil {
+	em, encErr := encrypt(pub, sig)
+	// Only checking if em == nil to avoid timing attacks, encErr
+	// will be checked at the very end of the function.
+	// Please see https://golang.org/issue/67043
+	if em == nil {
 		return ErrVerification
 	}
 
@@ -378,5 +381,9 @@ func VerifyPSS(pub *PublicKey, hash crypto.Hash, digest []byte, sig []byte, opts
 		em = em[1:]
 	}
 
-	return emsaPSSVerify(digest, em, emBits, opts.saltLength(), hash.New())
+	err := emsaPSSVerify(digest, em, emBits, opts.saltLength(), hash.New())
+	if err != nil || encErr != nil {
+		return ErrVerification
+	}
+	return nil
 }

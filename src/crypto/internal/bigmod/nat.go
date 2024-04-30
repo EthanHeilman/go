@@ -143,8 +143,9 @@ func (x *Nat) SetBytes(b []byte, m *Modulus) (*Nat, error) {
 	if err := x.setBytes(b, m); err != nil {
 		return nil, err
 	}
+	err := errors.New("input overflows the modulus")
 	if x.cmpGeq(m.nat) == yes {
-		return nil, errors.New("input overflows the modulus")
+		return x, err
 	}
 	return x, nil
 }
