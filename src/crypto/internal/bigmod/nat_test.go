@@ -5,6 +5,7 @@
 package bigmod
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"math/bits"
@@ -121,6 +122,65 @@ func TestShiftIn(t *testing.T) {
 		if exp := natFromBytes(tt.expected).ExpandFor(m); got.Equal(exp) != 1 {
 			t.Errorf("%d: got %v, expected %v", i, got, exp)
 		}
+	}
+}
+
+func TestGeCmpConstant(t *testing.T) {
+	nBytes, err := hex.DecodeString("7107aa995662b8e15e4006e87a65217dea058c18d718ff1f2b184ce28f6ca575eb5be856255575f80df4e0ed35cc7b65f10ffb916375e82161e812a7d31e88b37ce73f98161122aa17ff0e08f476553666610ddc475b1d927156a81edb7f8cfeb59d326a6a513f06a06b46b8e1d10923baac0822b2206bfdb5c305b53ae19d8dfd74223dc19aab86b1eafb76c8900364a302c061dc65ed75fead477323a451d1ebf73f633c2e4a36c08a0e29304ff1672fd500171b5ad8d76d6cd14d25f1b39dc995f3757ebdefc8da7453d5ec8f595f07e5d8a039248c2250bf36221661cf386a60267ebaf3550deeb7dcc77cbb2a49837ef2cbe7e3c582ad5f77c266cf9b6d")
+	if err != nil {
+		panic(err)
+	}
+	var n big.Int
+	n.SetBytes(nBytes)
+
+	fmt.Printf("nBytes :       %x (%d)\n", nBytes, len(nBytes))
+	fmt.Printf("n :       %x (%d)\n", n.Bytes(), len(n.Bytes()))
+
+	var vsmaller big.Int
+	vsmallerBytes, err := hex.DecodeString("009bfb983e6129a0df25c677cd2440af51fd5abd62144e20c674a769c20ccd42f5f3c2dcf36c1ec83e8fe95e4aaa526e362876a4f1e440ac8b306700b32e6ed27e23e07182d1f418e23926168e1ccca1bd7e619ad8a63e9022db63e72cc9459acdb3cc424675e620aea282282cdb24ab726911f8f8881e19004ab13493f9d37b7b61dfeb42c7c159627daca1e67e72abaa50727c7d2925abcc7e8b1ad0195e6426254117f1e67dccca01c8780dcb5a45ed4fc4153919ede5fae2fbf9d538f4ae5e4b35a85ff1dede093b1cac6a5f4cdde88732c7f5d7d3995a0e381cb203bd8d92b4063b847fe94ef4cd79c5a63d85b69d8144e0d8ca8a51f4876e726c2cec71")
+	if err != nil {
+		panic(err)
+	}
+	vsmaller.SetBytes(vsmallerBytes)
+	fmt.Printf("Very smaller:  %x (%d)\n", vsmaller.Bytes(), len(vsmaller.Bytes()))
+
+	var smaller big.Int
+	smaller.SetBytes(nBytes)
+	smaller.SetBit(&smaller, 2044, 0)
+	fmt.Printf("Smaller:  %x (%d)\n", smaller.Bytes(), len(smaller.Bytes()))
+
+	var same big.Int
+	same.SetBytes(nBytes)
+	fmt.Printf("Same:     %x (%d)\n", same.Bytes(), len(same.Bytes()))
+
+	var larger big.Int
+	larger.SetBytes(nBytes)
+	larger.SetBit(&larger, 2043, 1)
+	fmt.Printf("Larger:   %x (%d)\n", larger.Bytes(), len(larger.Bytes()))
+
+	N, err := NewModulusFromBig(&n)
+	if err != nil {
+		panic(err)
+	}
+
+	x := natFromBytes(smaller.Bytes())
+	em := x.GeCmpConstant(N)
+
+	if em != 0 {
+		t.Errorf("smaller should be smaller, got = (%d)", em)
+	}
+
+	x = natFromBytes(same.Bytes())
+
+	em = x.GeCmpConstant(N)
+	if em != 1 {
+		t.Errorf("same should be same, got = (%d)", em)
+	}
+
+	x = natFromBytes(larger.Bytes())
+	em = x.GeCmpConstant(N)
+	if em != 1 {
+		t.Errorf("larger should be larger, got = (%d)", em)
 	}
 }
 
@@ -255,6 +315,10 @@ func TestMod(t *testing.T) {
 		t.Errorf("%+v != %+v", out, expected)
 	}
 }
+
+// func TestGeCmpConstant(t *testing.T){
+
+// }
 
 func TestModSub(t *testing.T) {
 	m := modulusFromBytes([]byte{13})
