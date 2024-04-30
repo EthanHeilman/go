@@ -361,7 +361,7 @@ func VerifyPSS(pub *PublicKey, hash crypto.Hash, digest []byte, sig []byte, opts
 
 	emBits := pub.N.BitLen() - 1
 	emLen := (emBits + 7) / 8
-	em, err := encrypt(pub, sig)
+	em, ok, err := encrypt(pub, sig)
 	if err != nil {
 		return ErrVerification
 	}
@@ -377,6 +377,13 @@ func VerifyPSS(pub *PublicKey, hash crypto.Hash, digest []byte, sig []byte, opts
 		}
 		em = em[1:]
 	}
-
-	return emsaPSSVerify(digest, em, emBits, opts.saltLength(), hash.New())
+	if err := emsaPSSVerify(digest, em, emBits, opts.saltLength(), hash.New()); err != nil {
+		return err
+	}
+	// if encrypt returns ok != 1 and encrypt didn't return an error,
+	// then the signature overflowed the modulus
+	if ok != 1 {
+		return ErrVerification
+	}
+	return nil
 }

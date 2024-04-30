@@ -479,20 +479,20 @@ func mgf1XOR(out []byte, hash hash.Hash, seed []byte) {
 // be returned if the size of the salt is too large.
 var ErrMessageTooLong = errors.New("crypto/rsa: message too long for RSA key size")
 
-func encrypt(pub *PublicKey, plaintext []byte) ([]byte, error) {
+func encrypt(pub *PublicKey, plaintext []byte) ([]byte, int, error) {
 	boring.Unreachable()
 
 	N, err := bigmod.NewModulusFromBig(pub.N)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	m, err := bigmod.NewNat().SetBytes(plaintext, N)
+	m, ok, err := bigmod.NewNat().SetOverflowingBytes(plaintext, N)
 	if err != nil {
-		return nil, err
+		return nil, ok, err
 	}
 	e := uint(pub.E)
 
-	return bigmod.NewNat().ExpShortVarTime(m, e, N).Bytes(N), nil
+	return bigmod.NewNat().ExpShortVarTime(m, e, N).Bytes(N), ok, nil
 }
 
 // EncryptOAEP encrypts the given message with RSA-OAEP.
@@ -567,7 +567,8 @@ func EncryptOAEP(hash hash.Hash, random io.Reader, pub *PublicKey, msg []byte, l
 		return boring.EncryptRSANoPadding(bkey, em)
 	}
 
-	return encrypt(pub, em)
+	b, _, err := encrypt(pub, em)
+	return b, err
 }
 
 // ErrDecryption represents a failure to decrypt a message.
