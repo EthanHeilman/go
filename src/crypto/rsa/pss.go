@@ -361,8 +361,8 @@ func VerifyPSS(pub *PublicKey, hash crypto.Hash, digest []byte, sig []byte, opts
 
 	emBits := pub.N.BitLen() - 1
 	emLen := (emBits + 7) / 8
-	em, err := encrypt(pub, sig)
-	if err != nil {
+	em, ok := constantTimeEncrypt(pub, sig)
+	if em == nil {
 		return ErrVerification
 	}
 
@@ -378,5 +378,9 @@ func VerifyPSS(pub *PublicKey, hash crypto.Hash, digest []byte, sig []byte, opts
 		em = em[1:]
 	}
 
-	return emsaPSSVerify(digest, em, emBits, opts.saltLength(), hash.New())
+	err := emsaPSSVerify(digest, em, emBits, opts.saltLength(), hash.New())
+	if err != nil || ok != 1 {
+		return ErrVerification
+	}
+	return nil
 }

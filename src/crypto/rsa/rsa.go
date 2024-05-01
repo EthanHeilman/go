@@ -495,6 +495,32 @@ func encrypt(pub *PublicKey, plaintext []byte) ([]byte, error) {
 	return bigmod.NewNat().ExpShortVarTime(m, e, N).Bytes(N), nil
 }
 
+// constantTimeEncrypt performs the same function as encrypt but doesn't fail
+// early and leak that information about the signature via a timing channel.
+func constantTimeEncrypt(pub *PublicKey, plaintext []byte) ([]byte, int) {
+	boring.Unreachable()
+
+	ok := 1
+	N, err := bigmod.NewModulusFromBig(pub.N)
+	if err != nil {
+		return nil, 0
+	}
+	m, underflow, err := bigmod.NewNat().SetOverflowingBytes(plaintext, N)
+	if err != nil {
+		return nil, 0
+	}
+	e := uint(pub.E)
+
+	// If underflow == 0, N < sig, modulus did not overflow
+	// (underflow = N - sig).
+	if underflow != 0 {
+		ok = 1
+	} else {
+		ok = 0
+	}
+	return bigmod.NewNat().ExpShortVarTime(m, e, N).Bytes(N), ok
+}
+
 // EncryptOAEP encrypts the given message with RSA-OAEP.
 //
 // OAEP is parameterised by a hash function that is used as a random oracle.

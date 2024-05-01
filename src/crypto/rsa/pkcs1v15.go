@@ -351,13 +351,13 @@ func VerifyPKCS1v15(pub *PublicKey, hash crypto.Hash, hashed []byte, sig []byte)
 		return ErrVerification
 	}
 
-	em, err := encrypt(pub, sig)
-	if err != nil {
+	em, ok := constantTimeEncrypt(pub, sig)
+	if em == nil {
 		return ErrVerification
 	}
 	// EM = 0x00 || 0x01 || PS || 0x00 || T
 
-	ok := subtle.ConstantTimeByteEq(em[0], 0)
+	ok &= subtle.ConstantTimeByteEq(em[0], 0)
 	ok &= subtle.ConstantTimeByteEq(em[1], 1)
 	ok &= subtle.ConstantTimeCompare(em[k-hashLen:k], hashed)
 	ok &= subtle.ConstantTimeCompare(em[k-tLen:k-hashLen], prefix)
