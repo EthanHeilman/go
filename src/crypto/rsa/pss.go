@@ -9,6 +9,7 @@ package rsa
 import (
 	"bytes"
 	"crypto"
+	"crypto/internal/bigmod"
 	"crypto/internal/boring"
 	"errors"
 	"hash"
@@ -361,8 +362,27 @@ func VerifyPSS(pub *PublicKey, hash crypto.Hash, digest []byte, sig []byte, opts
 
 	emBits := pub.N.BitLen() - 1
 	emLen := (emBits + 7) / 8
-	em, err := encrypt(pub, sig)
+
+	// If encrypt is supplied a sig and modulus N such that:
+	// sig overflows N and bitlen(sig) <= bitlen(N) it will fail early
+	// creating a timing channel that leaks sig or N.
+	// To mitigate this timing channel, use SetOverflowingBytes to reduce
+	// sig to < N when sig >= N. We then run verification as normal and if we
+	// reduced the signature we always return ErrVerification.
+	// Please see https://golang.org/issue/67043
+	// There is no good way to remove this VerifyPSS is not constant time, there is no good way to fix this
+	N, err := bigmod.NewModulusFromBig(pub.N)
 	if err != nil {
+		return ErrVerification
+	}
+	m, overflowed, err := bigmod.NewNat().SetOverflowingBytes(sig, N)
+	if err != nil {
+		return ErrVerification
+	}
+	sig = m.Bytes(N)
+
+	em, err := encrypt(pub, sig)
+	if err != nil || overflowed == 1 {
 		return ErrVerification
 	}
 

@@ -6,6 +6,7 @@ package rsa
 
 import (
 	"crypto"
+	"crypto/internal/bigmod"
 	"crypto/internal/boring"
 	"crypto/internal/randutil"
 	"crypto/subtle"
@@ -351,13 +352,31 @@ func VerifyPKCS1v15(pub *PublicKey, hash crypto.Hash, hashed []byte, sig []byte)
 		return ErrVerification
 	}
 
+	// If encrypt is supplied a sig and modulus N such that:
+	// sig overflows N and bitlen(sig) <= bitlen(N) it will fail early
+	// creating a timing channel that leaks sig or N.
+	// To mitigate this timing channel, use SetOverflowingBytes to reduce
+	// sig to < N when sig >= N. We then run verification as normal and if we
+	// reduced the signature we always return ErrVerification.
+	// See https://golang.org/issue/67043
+	N, err := bigmod.NewModulusFromBig(pub.N)
+	if err != nil {
+		return ErrVerification
+	}
+	m, overflowed, err := bigmod.NewNat().SetOverflowingBytes(sig, N)
+	if err != nil {
+		return ErrVerification
+	}
+	sig = m.Bytes(N)
+
 	em, err := encrypt(pub, sig)
 	if err != nil {
 		return ErrVerification
 	}
 	// EM = 0x00 || 0x01 || PS || 0x00 || T
 
-	ok := subtle.ConstantTimeByteEq(em[0], 0)
+	ok := int(overflowed ^ 1)
+	ok &= subtle.ConstantTimeByteEq(em[0], 0)
 	ok &= subtle.ConstantTimeByteEq(em[1], 1)
 	ok &= subtle.ConstantTimeCompare(em[k-hashLen:k], hashed)
 	ok &= subtle.ConstantTimeCompare(em[k-tLen:k-hashLen], prefix)
