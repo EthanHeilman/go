@@ -5,6 +5,7 @@
 package bigmod
 
 import (
+	"crypto/subtle"
 	"encoding/binary"
 	"errors"
 	"math/big"
@@ -154,7 +155,7 @@ func (x *Nat) SetBytes(b []byte, m *Modulus) (*Nat, error) {
 // reduces overflowing values up to 2^⌈log2(m)⌉ - 1.
 //
 // The output will be resized to the size of m and overwritten.
-func (x *Nat) SetOverflowingBytes(b []byte, m *Modulus) (*Nat, uint, error) {
+func (x *Nat) SetOverflowingBytes(b []byte, m *Modulus) (*Nat, choice, error) {
 	if err := x.setBytes(b, m); err != nil {
 		return nil, 0, err
 	}
@@ -162,8 +163,14 @@ func (x *Nat) SetOverflowingBytes(b []byte, m *Modulus) (*Nat, uint, error) {
 	if leading < m.leading {
 		return nil, 0, errors.New("input overflows the modulus size")
 	}
+
+	// If x-m has no underflow then b overflows m (m <= x). In all other cases
+	// no overflow occurred.
 	underflow := x.maybeSubtractModulus(no, m)
-	return x, underflow, nil
+	// We only need to check first byte of underflow because we have already
+	// checked bitlen(m)>=bitlen(x), thus 0 <= overflow <= 7.
+	overflowed := choice(subtle.ConstantTimeByteEq(uint8(underflow), uint8(0)))
+	return x, overflowed, nil
 }
 
 // bigEndianUint returns the contents of buf interpreted as a

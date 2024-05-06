@@ -351,7 +351,7 @@ func VerifyPKCS1v15(pub *PublicKey, hash crypto.Hash, hashed []byte, sig []byte)
 		return ErrVerification
 	}
 
-	em, ok := constantTimeEncrypt(pub, sig)
+	em, ok := timingSafeEncrypt(pub, sig)
 	if em == nil {
 		return ErrVerification
 	}
